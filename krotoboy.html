@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Кротобой 🔨</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #8B6914;
+    font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', cursive;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+
+  #game-wrapper {
+    position: relative;
+    width: 700px;
+    height: 600px;
+    max-width: 100vw;
+    max-height: 100vh;
+  }
+
+  /* ===== HUD ===== */
+  #hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    z-index: 100;
+  }
+
+  #hearts {
+    font-size: 40px;
+    letter-spacing: 5px;
+    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+  }
+
+  #score-box {
+    background: rgba(255,255,255,0.85);
+    border: 3px solid #5a3e1b;
+    border-radius: 15px;
+    padding: 8px 20px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #5a3e1b;
+    box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+  }
+
+  /* ===== FIELD ===== */
+  #field {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #7ec850 0%, #5da832 40%, #4a8c28 100%);
+    border-radius: 20px;
+    border: 6px solid #3d6b1e;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.15), 4px 4px 15px rgba(0,0,0,0.3);
+    cursor: none;
+    touch-action: none;
+  }
+
+  #field::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 30px,
+      rgba(255,255,255,0.04) 30px,
+      rgba(255,255,255,0.04) 31px
+    );
+    pointer-events: none;
+  }
+
+  /* ===== HOLES ===== */
+  .hole {
+    position: absolute;
+    width: 130px;
+    height: 70px;
+    z-index: 10;
+  }
+
+  .hole-oval {
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, #1a0e05 0%, #3d2410 50%, #5a3a1e 80%, #7a5530 100%);
+    border-radius: 50%;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4), inset 0 4px 8px rgba(0,0,0,0.6);
+    position: relative;
+  }
+
+  .hole-oval::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 5%;
+    width: 90%;
+    height: 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 50%;
+    filter: blur(3px);
+  }
+
+  .hole:nth-child(1) { top: 200px; left: 270px; }
+  .hole:nth-child(2) { top: 340px; left: 120px; }
+  .hole:nth-child(3) { top: 340px; left: 430px; }
+  .hole:nth-child(4) { top: 440px; left: 270px; }
+
+  /* ===== MOLE ===== */
+  .mole-container {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 30px;
+    z-index: 5;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .mole {
+    position: absolute;
+    bottom: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90px;
+    height: 90px;
+    transition: bottom 0.15s ease-out;
+    pointer-events: auto;
+    cursor: none;
+  }
+
+  .mole.show { bottom: 0px; }
+
+  .mole.hit {
+    bottom: 0px;
+    animation: hitSquish 0.3s ease-out forwards;
+  }
+
+  .mole.laugh {
+    bottom: 0px;
+    animation: laughShake 0.5s ease-out;
+  }
+
+  @keyframes hitSquish {
+    0% { transform: translateX(-50%) scaleY(1); }
+    50% { transform: translateX(-50%) scaleY(0.3) scaleX(1.3); }
+    100% { transform: translateX(-50%) scaleY(0); opacity: 0; }
+  }
+
+  @keyframes laughShake {
+    0%, 100% { transform: translateX(-50%) rotate(0); }
+    20% { transform: translateX(-50%) rotate(-10deg); }
+    40% { transform: translateX(-50%) rotate(10deg); }
+    60% { transform: translateX(-50%) rotate(-8deg); }
+    80% { transform: translateX(-50%) rotate(8deg); }
+  }
+
+  .mole-body {
+    width: 90px;
+    height: 90px;
+    position: relative;
+  }
+
+  .mole-body svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ===== HAMMER CURSOR ===== */
+  #hammer {
+    position: fixed;
+    width: 80px;
+    height: 80px;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-10%, -10%);
+    transition: transform 0.05s;
+    filter: drop-shadow(3px 3px 4px rgba(0,0,0,0.4));
+    display: none;
+  }
+
+  #hammer.active { display: block; }
+
+  #hammer.swing {
+    transform: translate(-10%, -10%) rotate(-45deg) scale(1.1);
+  }
+
+  #hammer svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ===== OVERLAYS ===== */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+  }
+
+  .overlay h1 {
+    font-size: 52px;
+    color: #fff;
+    text-shadow: 3px 3px 0 #5a3e1b, -1px -1px 0 #5a3e1b;
+    margin-bottom: 10px;
+  }
+
+  .overlay h2 {
+    font-size: 36px;
+    color: #ffe066;
+    text-shadow: 2px 2px 0 #5a3e1b;
+    margin-bottom: 20px;
+  }
+
+  .overlay p {
+    font-size: 22px;
+    color: #fff;
+    margin-bottom: 20px;
+  }
+
+  .btn {
+    padding: 15px 40px;
+    font-size: 28px;
+    font-family: inherit;
+    font-weight: bold;
+    color: #fff;
+    background: linear-gradient(180deg, #e85d3a, #c0392b);
+    border: 4px solid #fff;
+    border-radius: 20px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #8b1a1a, 0 8px 15px rgba(0,0,0,0.3);
+    transition: all 0.1s;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 0 #8b1a1a, 0 10px 20px rgba(0,0,0,0.3);
+  }
+
+  .btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #8b1a1a;
+  }
+
+  .hidden { display: none !important; }
+
+  .float-score {
+    position: absolute;
+    font-size: 32px;
+    font-weight: bold;
+    color: #ffe066;
+    text-shadow: 2px 2px 0 #000;
+    pointer-events: none;
+    z-index: 150;
+    animation: floatUp 0.8s ease-out forwards;
+  }
+
+  .float-score.minus { color: #ff4444; }
+
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-60px) scale(1.5); }
+  }
+
+  .deco-mole {
+    font-size: 80px;
+    animation: bounce 1s infinite alternate;
+  }
+
+  @keyframes bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-15px); }
+  }
+
+  #field.damage {
+    animation: damageFlash 0.3s;
+  }
+
+  @keyframes damageFlash {
+    0%, 100% { filter: none; }
+    50% { filter: brightness(1.5) hue-rotate(-20deg); }
+  }
+
+  /* Mobile adaptations */
+  @media (max-width: 720px) {
+    #game-wrapper {
+      width: 100vw;
+      height: 100vh;
+    }
+    
+    .hole:nth-child(1) { top: 25vh; left: 38%; }
+    .hole:nth-child(2) { top: 45vh; left: 15%; }
+    .hole:nth-child(3) { top: 45vh; left: 62%; }
+    .hole:nth-child(4) { top: 65vh; left: 38%; }
+    
+    #hearts { font-size: 30px; }
+    #score-box { font-size: 18px; padding: 6px 14px; }
+    .overlay h1 { font-size: 36px; }
+    .overlay h2 { font-size: 24px; }
+    .btn { font-size: 22px; padding: 12px 30px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="hammer">
+  <svg viewBox="0 0 100 100">
+    <rect x="42" y="50" width="16" height="48" rx="4" fill="#8B6914" stroke="#5a3e1b" stroke-width="2"/>
+    <rect x="44" y="52" width="6" height="44" rx="2" fill="#a07828" opacity="0.5"/>
+    <rect x="20" y="15" width="60" height="38" rx="8" fill="#888" stroke="#555" stroke-width="2"/>
+    <rect x="22" y="17" width="56" height="14" rx="5" fill="#aaa"/>
+    <rect x="22" y="35" width="56" height="14" rx="5" fill="#666"/>
+    <rect x="28" y="20" width="20" height="6" rx="3" fill="#ddd" opacity="0.6"/>
+  </svg>
+</div>
+
+<div id="game-wrapper">
+  <div id="hud">
+    <div id="hearts">❤️❤️❤️</div>
+    <div id="score-box">Очки: <span id="score">0</span></div>
+  </div>
+
+  <div id="field">
+    <div class="hole" data-index="0">
+      <div class="mole-container">
+        <div class="mole" id="mole-0">
+          <div class="mole-body">
+            <svg viewBox="0 0 100 100">
+              <ellipse cx="50" cy="70" rx="42" ry="32" fill="#6B3A1F"/>
+              <ellipse cx="50" cy="65" rx="38" ry="28" fill="#8B5A2B"/>
+              <ellipse cx="50" cy="55" rx="30" ry="25" fill="#A0724B"/>
+              <ellipse cx="50" cy="50" rx="10" ry="7" fill="#FF6B8A"/>
+              <ellipse cx="48" cy="48" rx="3" ry="2" fill="#FFB0C8"/>
+              <circle cx="35" cy="42" r="6" fill="#222"/>
+              <circle cx="65" cy="42" r="6" fill="#222"/>
+              <circle cx="37" cy="40" r="2" fill="#fff"/>
+              <circle cx="67" cy="40" r="2" fill="#fff"/>
+              <path id="mole-mouth-0" d="M 40 60 Q 50 68 60 60" stroke="#3a1f0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <circle cx="28" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="72" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="20" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="80" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="20" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+              <circle cx="80" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="hole-oval"></div>
+    </div>
+
+    <div class="hole" data-index="1">
+      <div class="mole-container">
+        <div class="mole" id="mole-1">
+          <div class="mole-body">
+            <svg viewBox="0 0 100 100">
+              <ellipse cx="50" cy="70" rx="42" ry="32" fill="#6B3A1F"/>
+              <ellipse cx="50" cy="65" rx="38" ry="28" fill="#8B5A2B"/>
+              <ellipse cx="50" cy="55" rx="30" ry="25" fill="#A0724B"/>
+              <ellipse cx="50" cy="50" rx="10" ry="7" fill="#FF6B8A"/>
+              <ellipse cx="48" cy="48" rx="3" ry="2" fill="#FFB0C8"/>
+              <circle cx="35" cy="42" r="6" fill="#222"/>
+              <circle cx="65" cy="42" r="6" fill="#222"/>
+              <circle cx="37" cy="40" r="2" fill="#fff"/>
+              <circle cx="67" cy="40" r="2" fill="#fff"/>
+              <path id="mole-mouth-1" d="M 40 60 Q 50 68 60 60" stroke="#3a1f0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <circle cx="28" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="72" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="20" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="80" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="20" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+              <circle cx="80" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="hole-oval"></div>
+    </div>
+
+    <div class="hole" data-index="2">
+      <div class="mole-container">
+        <div class="mole" id="mole-2">
+          <div class="mole-body">
+            <svg viewBox="0 0 100 100">
+              <ellipse cx="50" cy="70" rx="42" ry="32" fill="#6B3A1F"/>
+              <ellipse cx="50" cy="65" rx="38" ry="28" fill="#8B5A2B"/>
+              <ellipse cx="50" cy="55" rx="30" ry="25" fill="#A0724B"/>
+              <ellipse cx="50" cy="50" rx="10" ry="7" fill="#FF6B8A"/>
+              <ellipse cx="48" cy="48" rx="3" ry="2" fill="#FFB0C8"/>
+              <circle cx="35" cy="42" r="6" fill="#222"/>
+              <circle cx="65" cy="42" r="6" fill="#222"/>
+              <circle cx="37" cy="40" r="2" fill="#fff"/>
+              <circle cx="67" cy="40" r="2" fill="#fff"/>
+              <path id="mole-mouth-2" d="M 40 60 Q 50 68 60 60" stroke="#3a1f0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <circle cx="28" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="72" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="20" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="80" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="20" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+              <circle cx="80" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="hole-oval"></div>
+    </div>
+
+    <div class="hole" data-index="3">
+      <div class="mole-container">
+        <div class="mole" id="mole-3">
+          <div class="mole-body">
+            <svg viewBox="0 0 100 100">
+              <ellipse cx="50" cy="70" rx="42" ry="32" fill="#6B3A1F"/>
+              <ellipse cx="50" cy="65" rx="38" ry="28" fill="#8B5A2B"/>
+              <ellipse cx="50" cy="55" rx="30" ry="25" fill="#A0724B"/>
+              <ellipse cx="50" cy="50" rx="10" ry="7" fill="#FF6B8A"/>
+              <ellipse cx="48" cy="48" rx="3" ry="2" fill="#FFB0C8"/>
+              <circle cx="35" cy="42" r="6" fill="#222"/>
+              <circle cx="65" cy="42" r="6" fill="#222"/>
+              <circle cx="37" cy="40" r="2" fill="#fff"/>
+              <circle cx="67" cy="40" r="2" fill="#fff"/>
+              <path id="mole-mouth-3" d="M 40 60 Q 50 68 60 60" stroke="#3a1f0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <circle cx="28" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="72" cy="55" r="6" fill="#FF9999" opacity="0.5"/>
+              <circle cx="20" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="80" cy="40" r="8" fill="#6B3A1F"/>
+              <circle cx="20" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+              <circle cx="80" cy="40" r="4" fill="#FF9999" opacity="0.4"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="hole-oval"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="start-screen">
+    <div class="deco-mole"></div>
+    <h1>КРОТОБОЙ!</h1>
+    <p>Прихлопни кротов молотком! 🔨</p>
+    <button class="btn" id="start-btn">Играть!</button>
+  </div>
+
+  <div class="overlay hidden" id="gameover-screen">
+    <h1>😵 Кроты победили!</h1>
+    <h2>Твой счёт: <span id="final-score">0</span></h2>
+    <button class="btn" id="restart-btn">Ещё разок?</button>
+  </div>
+</div>
+
+<script>
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, duration, type = 'square', volume = 0.15, delay = 0) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+  gain.gain.setValueAtTime(volume, audioCtx.currentTime + delay);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(audioCtx.currentTime + delay);
+  osc.stop(audioCtx.currentTime + delay + duration);
+}
+
+function playHitJingle() {
+  const notes = [523, 659, 784, 1047];
+  notes.forEach((n, i) => playTone(n, 0.15, 'square', 0.12, i * 0.08));
+}
+
+function playLaugh() {
+  const base = 300;
+  for (let i = 0; i < 6; i++) {
+    playTone(base + Math.random() * 200, 0.1, 'sawtooth', 0.08, i * 0.07);
+  }
+}
+
+let melodyInterval;
+const melodyNotes = [
+  262, 330, 392, 523, 392, 330, 262, 294,
+  349, 440, 523, 440, 349, 294, 262, 330,
+  392, 523, 659, 523, 392, 330, 262, 294,
+  349, 392, 440, 523, 440, 392, 349, 330
+];
+let melodyIndex = 0;
+
+function startMelody() {
+  melodyIndex = 0;
+  melodyInterval = setInterval(() => {
+    playTone(melodyNotes[melodyIndex % melodyNotes.length], 0.2, 'triangle', 0.06);
+    playTone(melodyNotes[melodyIndex % melodyNotes.length] / 2, 0.2, 'sine', 0.03);
+    melodyIndex++;
+  }, 250);
+}
+
+function stopMelody() {
+  clearInterval(melodyInterval);
+}
+
+let score = 0;
+let lives = 3;
+let gameActive = false;
+let moleTimeout;
+let currentMole = -1;
+let speed = 1500;
+let minSpeed = 400;
+
+const moles = [0, 1, 2, 3].map(i => document.getElementById(`mole-${i}`));
+const scoreEl = document.getElementById('score');
+const heartsEl = document.getElementById('hearts');
+const field = document.getElementById('field');
+const hammer = document.getElementById('hammer');
+
+// ===== HAMMER CURSOR (mouse + touch) =====
+function moveHammer(x, y) {
+  hammer.style.left = x + 'px';
+  hammer.style.top = y + 'px';
+}
+
+function swingHammer() {
+  hammer.classList.add('swing');
+  setTimeout(() => hammer.classList.remove('swing'), 100);
+}
+
+// Mouse events
+document.addEventListener('mousemove', (e) => {
+  moveHammer(e.clientX, e.clientY);
+});
+
+document.addEventListener('mousedown', () => {
+  swingHammer();
+});
+
+// Touch events — главное исправление!
+document.addEventListener('touchmove', (e) => {
+  e.preventDefault(); // предотвращаем скролл
+  const touch = e.touches[0];
+  moveHammer(touch.clientX, touch.clientY);
+}, { passive: false });
+
+document.addEventListener('touchstart', (e) => {
+  const touch = e.touches[0];
+  moveHammer(touch.clientX, touch.clientY);
+  swingHammer();
+}, { passive: true });
+
+// ===== GAME LOGIC =====
+function updateHearts() {
+  heartsEl.textContent = '❤️'.repeat(lives) + ''.repeat(3 - lives);
+}
+
+function updateScore(val) {
+  score = val;
+  scoreEl.textContent = score;
+}
+
+function showFloatingText(text, x, y, isMinus = false) {
+  const el = document.createElement('div');
+  el.className = 'float-score' + (isMinus ? ' minus' : '');
+  el.textContent = text;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  field.appendChild(el);
+  setTimeout(() => el.remove(), 800);
+}
+
+function hideMole(index) {
+  moles[index].classList.remove('show', 'hit', 'laugh');
+  const mouth = document.getElementById(`mole-mouth-${index}`);
+  if (mouth) mouth.setAttribute('d', 'M 40 60 Q 50 68 60 60');
+}
+
+function showMole(index) {
+  hideAllMoles();
+  currentMole = index;
+  moles[index].classList.add('show');
+}
+
+function hideAllMoles() {
+  moles.forEach((m, i) => hideMole(i));
+  currentMole = -1;
+}
+
+function spawnMole() {
+  if (!gameActive) return;
+
+  let next;
+  do {
+    next = Math.floor(Math.random() * 4);
+  } while (next === currentMole && Math.random() > 0.3);
+
+  showMole(next);
+
+  moleTimeout = setTimeout(() => {
+    if (currentMole === next && gameActive) {
+      moles[next].classList.add('laugh');
+      const mouth = document.getElementById(`mole-mouth-${next}`);
+      if (mouth) mouth.setAttribute('d', 'M 38 58 Q 50 72 62 58');
+
+      playLaugh();
+      lives--;
+      updateHearts();
+      field.classList.add('damage');
+      setTimeout(() => field.classList.remove('damage'), 300);
+
+      const rect = moles[next].getBoundingClientRect();
+      const fieldRect = field.getBoundingClientRect();
+      showFloatingText('-1 ❤️', rect.left - fieldRect.left + 20, rect.top - fieldRect.top, true);
+
+      setTimeout(() => {
+        hideMole(next);
+        if (lives <= 0) {
+          gameOver();
+        } else {
+          scheduleNext();
+        }
+      }, 500);
+    }
+  }, speed);
+}
+
+function scheduleNext() {
+  if (!gameActive) return;
+  const delay = speed * 0.3 + Math.random() * speed * 0.5;
+  moleTimeout = setTimeout(spawnMole, delay);
+}
+
+function whackMole(index) {
+  if (!gameActive) return;
+  if (currentMole !== index) return;
+
+  clearTimeout(moleTimeout);
+
+  moles[index].classList.remove('show');
+  moles[index].classList.add('hit');
+
+  const mouth = document.getElementById(`mole-mouth-${index}`);
+  if (mouth) mouth.setAttribute('d', 'M 44 58 Q 50 66 56 58');
+
+  playHitJingle();
+  updateScore(score + 10);
+
+  const rect = moles[index].getBoundingClientRect();
+  const fieldRect = field.getBoundingClientRect();
+  showFloatingText('+10', rect.left - fieldRect.left + 20, rect.top - fieldRect.top);
+
+  speed = Math.max(minSpeed, speed - 30);
+
+  setTimeout(() => {
+    hideMole(index);
+    scheduleNext();
+  }, 300);
+}
+
+// Click/tap handlers on moles
+moles.forEach((mole, i) => {
+  mole.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    whackMole(i);
+  });
+  
+  mole.addEventListener('touchstart', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    whackMole(i);
+  }, { passive: false });
+});
+
+function startGame() {
+  initAudio();
+  score = 0;
+  lives = 3;
+  speed = 1500;
+  gameActive = true;
+  updateScore(0);
+  updateHearts();
+  hideAllMoles();
+
+  hammer.classList.add('active');
+
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('gameover-screen').classList.add('hidden');
+
+  startMelody();
+  scheduleNext();
+}
+
+function gameOver() {
+  gameActive = false;
+  clearTimeout(moleTimeout);
+  hideAllMoles();
+  stopMelody();
+  hammer.classList.remove('active');
+
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('gameover-screen').classList.remove('hidden');
+
+  playTone(400, 0.3, 'sawtooth', 0.1);
+  playTone(350, 0.3, 'sawtooth', 0.1, 0.3);
+  playTone(300, 0.3, 'sawtooth', 0.1, 0.6);
+  playTone(200, 0.6, 'sawtooth', 0.1, 0.9);
+}
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+// Prevent default touch behaviors (scrolling, zooming)
+document.addEventListener('touchmove', (e) => {
+  if (gameActive) e.preventDefault();
+}, { passive: false });
+</script>
+</body>
+</html>
